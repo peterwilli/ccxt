@@ -714,7 +714,10 @@ class wavesexchange(Exchange):
             'interval': self.timeframes[timeframe],
         }
         if since is not None:
+            timeframeUnix = self.parse_timeframe(timeframe) * 1000
             request['timeStart'] = str(since)
+            request['timeEnd'] = since + (timeframeUnix * limit)
+            request['timeEnd'] = str(request['timeEnd'])
         else:
             allowedCandles = self.safe_integer(self.options, 'allowedCandles', 1440)
             timeframeUnix = self.parse_timeframe(timeframe) * 1000

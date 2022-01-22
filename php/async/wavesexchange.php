@@ -742,7 +742,10 @@ class wavesexchange extends Exchange {
             'interval' => $this->timeframes[$timeframe],
         );
         if ($since !== null) {
+            $timeframeUnix = $this->parse_timeframe($timeframe) * 1000;
             $request['timeStart'] = (string) $since;
+            $request['timeEnd'] = $since . ($timeframeUnix * $limit);
+            $request['timeEnd'] = (string) $request['timeEnd'];
         } else {
             $allowedCandles = $this->safe_integer($this->options, 'allowedCandles', 1440);
             $timeframeUnix = $this->parse_timeframe($timeframe) * 1000;
