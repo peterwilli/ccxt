@@ -321,6 +321,17 @@ class wavesexchange(Exchange):
         self.options['messagePrefix'] = 'T' if enabled else 'W'
         return super(wavesexchange, self).set_sandbox_mode(enabled)
 
+    def calculate_fee(self, symbol, type, side, amount, price, takerOrMaker='taker', params={}):
+        # Waves has a fixed fee of 0.003 WAVES(see: https://docs.waves.exchange/en/api/fee)
+        rate = 0.003
+        cost = float(self.amount_to_precision(symbol, amount))
+        return {
+            'type': takerOrMaker,
+            'currency': 'WAVES',
+            'rate': rate,
+            'cost': float(self.fee_to_precision(symbol, rate * cost)),
+        }
+
     def get_quotes(self):
         quotes = self.safe_value(self.options, 'quotes')
         if quotes:

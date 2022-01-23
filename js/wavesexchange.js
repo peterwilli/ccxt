@@ -311,6 +311,18 @@ module.exports = class wavesexchange extends Exchange {
         return super.setSandboxMode (enabled);
     }
 
+    calculateFee (symbol, type, side, amount, price, takerOrMaker = 'taker', params = {}) {
+        // Waves has a fixed fee of 0.003 WAVES (see: https://docs.waves.exchange/en/api/fee)
+        const rate = 0.003;
+        const cost = parseFloat (this.amountToPrecision (symbol, amount));
+        return {
+            'type': takerOrMaker,
+            'currency': 'WAVES',
+            'rate': rate,
+            'cost': parseFloat (this.feeToPrecision (symbol, rate * cost)),
+        };
+    }
+
     async getQuotes () {
         let quotes = this.safeValue (this.options, 'quotes');
         if (quotes) {

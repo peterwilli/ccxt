@@ -317,6 +317,18 @@ class wavesexchange extends Exchange {
         return parent::set_sandbox_mode($enabled);
     }
 
+    public function calculate_fee($symbol, $type, $side, $amount, $price, $takerOrMaker = 'taker', $params = array ()) {
+        // Waves has a fixed fee of 0.003 WAVES (see => https://docs.waves.exchange/en/api/fee)
+        $rate = 0.003;
+        $cost = floatval($this->amount_to_precision($symbol, $amount));
+        return array(
+            'type' => $takerOrMaker,
+            'currency' => 'WAVES',
+            'rate' => $rate,
+            'cost' => floatval($this->fee_to_precision($symbol, $rate * $cost)),
+        );
+    }
+
     public function get_quotes() {
         $quotes = $this->safe_value($this->options, 'quotes');
         if ($quotes) {
