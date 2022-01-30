@@ -30,21 +30,49 @@ class wavesexchange(Exchange):
             'certified': True,
             'pro': False,
             'has': {
+                'CORS': None,
+                'spot': True,
+                'margin': False,
+                'swap': False,
+                'future': False,
+                'option': False,
+                'addMargin': False,
                 'cancelOrder': True,
                 'createMarketOrder': None,
                 'createOrder': True,
+                'createReduceOnlyOrder': False,
                 'fetchBalance': True,
+                'fetchBorrowRate': False,
+                'fetchBorrowRateHistory': False,
+                'fetchBorrowRates': False,
+                'fetchBorrowRatesPerSymbol': False,
                 'fetchClosedOrders': True,
                 'fetchDepositAddress': True,
+                'fetchFundingHistory': False,
+                'fetchFundingRate': False,
+                'fetchFundingRateHistory': False,
+                'fetchFundingRates': False,
+                'fetchIndexOHLCV': False,
+                'fetchIsolatedPositions': False,
+                'fetchLeverage': False,
                 'fetchMarkets': True,
+                'fetchMarkOHLCV': False,
                 'fetchMyTrades': True,
                 'fetchOHLCV': True,
                 'fetchOpenOrders': True,
-                'fetchOrderBook': True,
                 'fetchOrder': True,
+                'fetchOrderBook': True,
                 'fetchOrders': True,
+                'fetchPosition': False,
+                'fetchPositions': False,
+                'fetchPositionsRisk': False,
+                'fetchPremiumIndexOHLCV': False,
                 'fetchTicker': True,
                 'fetchTrades': True,
+                'reduceMargin': False,
+                'setLeverage': False,
+                'setMarginMode': False,
+                'setPositionMode': False,
                 'signIn': True,
                 'withdraw': True,
             },
@@ -65,7 +93,7 @@ class wavesexchange(Exchange):
             },
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/84547058-5fb27d80-ad0b-11ea-8711-78ac8b3c7f31.jpg',
-                'test': {
+                'api': {
                     'matcher': 'http://matcher-testnet.waves.exchange',
                     'node': 'https://nodes-testnet.wavesnodes.com',
                     'public': 'https://api-testnet.wavesplatform.com/v0',
@@ -73,7 +101,7 @@ class wavesexchange(Exchange):
                     'forward': 'https://testnet.waves.exchange/api/v1/forward/matcher',
                     'market': 'https://testnet.waves.exchange/api/v1/forward/marketdata/api/v1',
                 },
-                'api': {
+                'test': {
                     'matcher': 'http://matcher.waves.exchange',
                     'node': 'https://nodes.waves.exchange',
                     'public': 'https://api.wavesplatform.com/v0',
@@ -275,7 +303,7 @@ class wavesexchange(Exchange):
                 'withdrawFeeUSDN': 7420,
                 'withdrawFeeWAVES': 100000,
                 'wavesPrecision': 8,
-                'messagePrefix': 'W',  # W for production, T for testnet
+                'messagePrefix': 'T',  # W for production, T for testnet
                 'networks': {
                     'ERC20': 'ETH',
                     'BEP20': 'BSC',
@@ -320,17 +348,6 @@ class wavesexchange(Exchange):
     def set_sandbox_mode(self, enabled):
         self.options['messagePrefix'] = 'T' if enabled else 'W'
         return super(wavesexchange, self).set_sandbox_mode(enabled)
-
-    def calculate_fee(self, symbol, type, side, amount, price, takerOrMaker='taker', params={}):
-        # Waves has a fixed fee of 0.003 WAVES(see: https://docs.waves.exchange/en/api/fee)
-        rate = 0.003
-        cost = float(self.amount_to_precision(symbol, amount))
-        return {
-            'type': takerOrMaker,
-            'currency': 'WAVES',
-            'rate': rate,
-            'cost': float(self.fee_to_precision(symbol, rate * cost)),
-        }
 
     async def get_quotes(self):
         quotes = self.safe_value(self.options, 'quotes')
@@ -451,11 +468,11 @@ class wavesexchange(Exchange):
                 'swap': False,
                 'future': False,
                 'option': False,
+                'active': None,
                 'contract': False,
                 'linear': None,
                 'inverse': None,
                 'contractSize': None,
-                'active': None,
                 'expiry': None,
                 'expiryDatetime': None,
                 'strike': None,
@@ -652,13 +669,13 @@ class wavesexchange(Exchange):
         if (symbol is None) and (market is not None):
             symbol = market['symbol']
         data = self.safe_value(ticker, 'data', {})
-        last = self.safe_number(data, 'lastPrice')
-        low = self.safe_number(data, 'low')
-        high = self.safe_number(data, 'high')
-        vwap = self.safe_number(data, 'weightedAveragePrice')
-        baseVolume = self.safe_number(data, 'volume')
-        quoteVolume = self.safe_number(data, 'quoteVolume')
-        open = self.safe_number(data, 'firstPrice')
+        last = self.safe_string(data, 'lastPrice')
+        low = self.safe_string(data, 'low')
+        high = self.safe_string(data, 'high')
+        vwap = self.safe_string(data, 'weightedAveragePrice')
+        baseVolume = self.safe_string(data, 'volume')
+        quoteVolume = self.safe_string(data, 'quoteVolume')
+        open = self.safe_string(data, 'firstPrice')
         return self.safe_ticker({
             'symbol': symbol,
             'timestamp': timestamp,
@@ -680,7 +697,7 @@ class wavesexchange(Exchange):
             'baseVolume': baseVolume,
             'quoteVolume': quoteVolume,
             'info': ticker,
-        }, market)
+        }, market, False)
 
     async def fetch_ticker(self, symbol, params={}):
         await self.load_markets()
@@ -725,10 +742,7 @@ class wavesexchange(Exchange):
             'interval': self.timeframes[timeframe],
         }
         if since is not None:
-            timeframeUnix = self.parse_timeframe(timeframe) * 1000
             request['timeStart'] = str(since)
-            request['timeEnd'] = since + (timeframeUnix * limit)
-            request['timeEnd'] = str(request['timeEnd'])
         else:
             allowedCandles = self.safe_integer(self.options, 'allowedCandles', 1440)
             timeframeUnix = self.parse_timeframe(timeframe) * 1000

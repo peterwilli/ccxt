@@ -18,21 +18,49 @@ module.exports = class wavesexchange extends Exchange {
             'certified': true,
             'pro': false,
             'has': {
+                'CORS': undefined,
+                'spot': true,
+                'margin': false,
+                'swap': false,
+                'future': false,
+                'option': false,
+                'addMargin': false,
                 'cancelOrder': true,
                 'createMarketOrder': undefined,
                 'createOrder': true,
+                'createReduceOnlyOrder': false,
                 'fetchBalance': true,
+                'fetchBorrowRate': false,
+                'fetchBorrowRateHistory': false,
+                'fetchBorrowRates': false,
+                'fetchBorrowRatesPerSymbol': false,
                 'fetchClosedOrders': true,
                 'fetchDepositAddress': true,
+                'fetchFundingHistory': false,
+                'fetchFundingRate': false,
+                'fetchFundingRateHistory': false,
+                'fetchFundingRates': false,
+                'fetchIndexOHLCV': false,
+                'fetchIsolatedPositions': false,
+                'fetchLeverage': false,
                 'fetchMarkets': true,
+                'fetchMarkOHLCV': false,
                 'fetchMyTrades': true,
                 'fetchOHLCV': true,
                 'fetchOpenOrders': true,
-                'fetchOrderBook': true,
                 'fetchOrder': true,
+                'fetchOrderBook': true,
                 'fetchOrders': true,
+                'fetchPosition': false,
+                'fetchPositions': false,
+                'fetchPositionsRisk': false,
+                'fetchPremiumIndexOHLCV': false,
                 'fetchTicker': true,
                 'fetchTrades': true,
+                'reduceMargin': false,
+                'setLeverage': false,
+                'setMarginMode': false,
+                'setPositionMode': false,
                 'signIn': true,
                 'withdraw': true,
             },
@@ -53,7 +81,7 @@ module.exports = class wavesexchange extends Exchange {
             },
             'urls': {
                 'logo': 'https://user-images.githubusercontent.com/1294454/84547058-5fb27d80-ad0b-11ea-8711-78ac8b3c7f31.jpg',
-                'test': {
+                'api': {
                     'matcher': 'http://matcher-testnet.waves.exchange',
                     'node': 'https://nodes-testnet.wavesnodes.com',
                     'public': 'https://api-testnet.wavesplatform.com/v0',
@@ -61,7 +89,7 @@ module.exports = class wavesexchange extends Exchange {
                     'forward': 'https://testnet.waves.exchange/api/v1/forward/matcher',
                     'market': 'https://testnet.waves.exchange/api/v1/forward/marketdata/api/v1',
                 },
-                'api': {
+                'test': {
                     'matcher': 'http://matcher.waves.exchange',
                     'node': 'https://nodes.waves.exchange',
                     'public': 'https://api.wavesplatform.com/v0',
@@ -263,7 +291,7 @@ module.exports = class wavesexchange extends Exchange {
                 'withdrawFeeUSDN': 7420,
                 'withdrawFeeWAVES': 100000,
                 'wavesPrecision': 8,
-                'messagePrefix': 'W', // W for production, T for testnet
+                'messagePrefix': 'T', // W for production, T for testnet
                 'networks': {
                     'ERC20': 'ETH',
                     'BEP20': 'BSC',
@@ -309,18 +337,6 @@ module.exports = class wavesexchange extends Exchange {
     setSandboxMode (enabled) {
         this.options['messagePrefix'] = enabled ? 'T' : 'W';
         return super.setSandboxMode (enabled);
-    }
-
-    calculateFee (symbol, type, side, amount, price, takerOrMaker = 'taker', params = {}) {
-        // Waves has a fixed fee of 0.003 WAVES (see: https://docs.waves.exchange/en/api/fee)
-        const rate = 0.003;
-        const cost = parseFloat (this.amountToPrecision (symbol, amount));
-        return {
-            'type': takerOrMaker,
-            'currency': 'WAVES',
-            'rate': rate,
-            'cost': parseFloat (this.feeToPrecision (symbol, rate * cost)),
-        };
     }
 
     async getQuotes () {
@@ -445,11 +461,11 @@ module.exports = class wavesexchange extends Exchange {
                 'swap': false,
                 'future': false,
                 'option': false,
+                'active': undefined,
                 'contract': false,
                 'linear': undefined,
                 'inverse': undefined,
                 'contractSize': undefined,
-                'active': undefined,
                 'expiry': undefined,
                 'expiryDatetime': undefined,
                 'strike': undefined,
@@ -673,13 +689,13 @@ module.exports = class wavesexchange extends Exchange {
             symbol = market['symbol'];
         }
         const data = this.safeValue (ticker, 'data', {});
-        const last = this.safeNumber (data, 'lastPrice');
-        const low = this.safeNumber (data, 'low');
-        const high = this.safeNumber (data, 'high');
-        const vwap = this.safeNumber (data, 'weightedAveragePrice');
-        const baseVolume = this.safeNumber (data, 'volume');
-        const quoteVolume = this.safeNumber (data, 'quoteVolume');
-        const open = this.safeNumber (data, 'firstPrice');
+        const last = this.safeString (data, 'lastPrice');
+        const low = this.safeString (data, 'low');
+        const high = this.safeString (data, 'high');
+        const vwap = this.safeString (data, 'weightedAveragePrice');
+        const baseVolume = this.safeString (data, 'volume');
+        const quoteVolume = this.safeString (data, 'quoteVolume');
+        const open = this.safeString (data, 'firstPrice');
         return this.safeTicker ({
             'symbol': symbol,
             'timestamp': timestamp,
@@ -701,7 +717,7 @@ module.exports = class wavesexchange extends Exchange {
             'baseVolume': baseVolume,
             'quoteVolume': quoteVolume,
             'info': ticker,
-        }, market);
+        }, market, false);
     }
 
     async fetchTicker (symbol, params = {}) {
@@ -748,10 +764,7 @@ module.exports = class wavesexchange extends Exchange {
             'interval': this.timeframes[timeframe],
         };
         if (since !== undefined) {
-            const timeframeUnix = this.parseTimeframe (timeframe) * 1000;
             request['timeStart'] = since.toString ();
-            request['timeEnd'] = since + (timeframeUnix * limit);
-            request['timeEnd'] = request['timeEnd'].toString ();
         } else {
             const allowedCandles = this.safeInteger (this.options, 'allowedCandles', 1440);
             const timeframeUnix = this.parseTimeframe (timeframe) * 1000;

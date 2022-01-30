@@ -24,21 +24,49 @@ class wavesexchange extends Exchange {
             'certified' => true,
             'pro' => false,
             'has' => array(
+                'CORS' => null,
+                'spot' => true,
+                'margin' => false,
+                'swap' => false,
+                'future' => false,
+                'option' => false,
+                'addMargin' => false,
                 'cancelOrder' => true,
                 'createMarketOrder' => null,
                 'createOrder' => true,
+                'createReduceOnlyOrder' => false,
                 'fetchBalance' => true,
+                'fetchBorrowRate' => false,
+                'fetchBorrowRateHistory' => false,
+                'fetchBorrowRates' => false,
+                'fetchBorrowRatesPerSymbol' => false,
                 'fetchClosedOrders' => true,
                 'fetchDepositAddress' => true,
+                'fetchFundingHistory' => false,
+                'fetchFundingRate' => false,
+                'fetchFundingRateHistory' => false,
+                'fetchFundingRates' => false,
+                'fetchIndexOHLCV' => false,
+                'fetchIsolatedPositions' => false,
+                'fetchLeverage' => false,
                 'fetchMarkets' => true,
+                'fetchMarkOHLCV' => false,
                 'fetchMyTrades' => true,
                 'fetchOHLCV' => true,
                 'fetchOpenOrders' => true,
-                'fetchOrderBook' => true,
                 'fetchOrder' => true,
+                'fetchOrderBook' => true,
                 'fetchOrders' => true,
+                'fetchPosition' => false,
+                'fetchPositions' => false,
+                'fetchPositionsRisk' => false,
+                'fetchPremiumIndexOHLCV' => false,
                 'fetchTicker' => true,
                 'fetchTrades' => true,
+                'reduceMargin' => false,
+                'setLeverage' => false,
+                'setMarginMode' => false,
+                'setPositionMode' => false,
                 'signIn' => true,
                 'withdraw' => true,
             ),
@@ -59,7 +87,7 @@ class wavesexchange extends Exchange {
             ),
             'urls' => array(
                 'logo' => 'https://user-images.githubusercontent.com/1294454/84547058-5fb27d80-ad0b-11ea-8711-78ac8b3c7f31.jpg',
-                'test' => array(
+                'api' => array(
                     'matcher' => 'http://matcher-testnet.waves.exchange',
                     'node' => 'https://nodes-testnet.wavesnodes.com',
                     'public' => 'https://api-testnet.wavesplatform.com/v0',
@@ -67,7 +95,7 @@ class wavesexchange extends Exchange {
                     'forward' => 'https://testnet.waves.exchange/api/v1/forward/matcher',
                     'market' => 'https://testnet.waves.exchange/api/v1/forward/marketdata/api/v1',
                 ),
-                'api' => array(
+                'test' => array(
                     'matcher' => 'http://matcher.waves.exchange',
                     'node' => 'https://nodes.waves.exchange',
                     'public' => 'https://api.wavesplatform.com/v0',
@@ -269,7 +297,7 @@ class wavesexchange extends Exchange {
                 'withdrawFeeUSDN' => 7420,
                 'withdrawFeeWAVES' => 100000,
                 'wavesPrecision' => 8,
-                'messagePrefix' => 'W', // W for production, T for testnet
+                'messagePrefix' => 'T', // W for production, T for testnet
                 'networks' => array(
                     'ERC20' => 'ETH',
                     'BEP20' => 'BSC',
@@ -315,18 +343,6 @@ class wavesexchange extends Exchange {
     public function set_sandbox_mode($enabled) {
         $this->options['messagePrefix'] = $enabled ? 'T' : 'W';
         return parent::set_sandbox_mode($enabled);
-    }
-
-    public function calculate_fee($symbol, $type, $side, $amount, $price, $takerOrMaker = 'taker', $params = array ()) {
-        // Waves has a fixed fee of 0.003 WAVES (see => https://docs.waves.exchange/en/api/fee)
-        $rate = 0.003;
-        $cost = floatval($this->amount_to_precision($symbol, $amount));
-        return array(
-            'type' => $takerOrMaker,
-            'currency' => 'WAVES',
-            'rate' => $rate,
-            'cost' => floatval($this->fee_to_precision($symbol, $rate * $cost)),
-        );
     }
 
     public function get_quotes() {
@@ -451,11 +467,11 @@ class wavesexchange extends Exchange {
                 'swap' => false,
                 'future' => false,
                 'option' => false,
+                'active' => null,
                 'contract' => false,
                 'linear' => null,
                 'inverse' => null,
                 'contractSize' => null,
-                'active' => null,
                 'expiry' => null,
                 'expiryDatetime' => null,
                 'strike' => null,
@@ -679,13 +695,13 @@ class wavesexchange extends Exchange {
             $symbol = $market['symbol'];
         }
         $data = $this->safe_value($ticker, 'data', array());
-        $last = $this->safe_number($data, 'lastPrice');
-        $low = $this->safe_number($data, 'low');
-        $high = $this->safe_number($data, 'high');
-        $vwap = $this->safe_number($data, 'weightedAveragePrice');
-        $baseVolume = $this->safe_number($data, 'volume');
-        $quoteVolume = $this->safe_number($data, 'quoteVolume');
-        $open = $this->safe_number($data, 'firstPrice');
+        $last = $this->safe_string($data, 'lastPrice');
+        $low = $this->safe_string($data, 'low');
+        $high = $this->safe_string($data, 'high');
+        $vwap = $this->safe_string($data, 'weightedAveragePrice');
+        $baseVolume = $this->safe_string($data, 'volume');
+        $quoteVolume = $this->safe_string($data, 'quoteVolume');
+        $open = $this->safe_string($data, 'firstPrice');
         return $this->safe_ticker(array(
             'symbol' => $symbol,
             'timestamp' => $timestamp,
@@ -707,7 +723,7 @@ class wavesexchange extends Exchange {
             'baseVolume' => $baseVolume,
             'quoteVolume' => $quoteVolume,
             'info' => $ticker,
-        ), $market);
+        ), $market, false);
     }
 
     public function fetch_ticker($symbol, $params = array ()) {
@@ -754,10 +770,7 @@ class wavesexchange extends Exchange {
             'interval' => $this->timeframes[$timeframe],
         );
         if ($since !== null) {
-            $timeframeUnix = $this->parse_timeframe($timeframe) * 1000;
             $request['timeStart'] = (string) $since;
-            $request['timeEnd'] = $since . ($timeframeUnix * $limit);
-            $request['timeEnd'] = (string) $request['timeEnd'];
         } else {
             $allowedCandles = $this->safe_integer($this->options, 'allowedCandles', 1440);
             $timeframeUnix = $this->parse_timeframe($timeframe) * 1000;
